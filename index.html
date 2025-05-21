@@ -81,12 +81,14 @@
     dropArea.addEventListener('dragenter', e => {
       console.log('🔸 dragenter 発火');
       e.preventDefault(); e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
       dropArea.classList.add('hover');
     });
 
     dropArea.addEventListener('dragover', e => {
       console.log('🔹 dragover 発火');
       e.preventDefault(); e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
       dropArea.classList.add('hover');
     });
 
