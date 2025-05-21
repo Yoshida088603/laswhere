@@ -73,34 +73,37 @@
     const output       = document.getElementById('output');
     const downloadLink = document.getElementById('download-csv');
 
-    // グローバルにデフォルト動作防止
+    // 全体のデフォルト動作を停止
     window.addEventListener('dragover', e => e.preventDefault());
-    window.addEventListener('drop', e => {
-      console.log('🌍 window.drop 発火');
-      e.preventDefault();
+    window.addEventListener('drop', e => e.preventDefault());
+
+    // ドロップエリアのイベントハンドラ
+    dropArea.addEventListener('dragenter', e => {
+      console.log('🔸 dragenter 発火');
+      e.preventDefault(); e.stopPropagation();
+      dropArea.classList.add('hover');
     });
 
-    // dragenter, dragover, dragleave はビジュアル制御用
-    ['dragenter', 'dragover', 'dragleave'].forEach(ev => {
-      dropArea.addEventListener(ev, e => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
+    dropArea.addEventListener('dragover', e => {
+      console.log('🔹 dragover 発火');
+      e.preventDefault(); e.stopPropagation();
+      dropArea.classList.add('hover');
     });
 
-    dropArea.addEventListener('dragover', () => dropArea.classList.add('hover'));
-    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('hover'));
+    dropArea.addEventListener('dragleave', e => {
+      console.log('🔸 dragleave 発火');
+      e.preventDefault(); e.stopPropagation();
+      dropArea.classList.remove('hover');
+    });
 
-    // drop は明示的に handleDrop へ
     dropArea.addEventListener('drop', e => {
-      console.log('🔽 dropArea.drop 発火');
-      e.preventDefault();
-      e.stopPropagation();
+      console.log('🔻 drop 発火');
+      e.preventDefault(); e.stopPropagation();
       handleDrop(e);
     });
 
     async function handleDrop(e) {
-      console.log('🔽 handleDrop 開始');
+      console.log('▶ handleDrop 開始');
       dropArea.classList.remove('hover');
       const files = Array.from(e.dataTransfer.files);
       if (!files.length) return;
@@ -122,7 +125,7 @@
     }
 
     async function processFile(file) {
-      console.log(`📂 処理中: ${file.name}`);
+      console.log(`📁 処理中: ${file.name}`);
       const arrayBuffer = await file.arrayBuffer();
       const module      = await modulePromise;
       const laszip      = new module.Laszip();
@@ -148,9 +151,7 @@
       }
 
       let csv = 'ファイル名,X,Y,Z\n';
-      results.forEach(r => {
-        csv += `${r.name},${r.x},${r.y},${r.z}\n`;
-      });
+      results.forEach(r => csv += `${r.name},${r.x},${r.y},${r.z}\n`);
 
       const blob = new Blob([csv], { type: 'text/csv' });
       const url  = URL.createObjectURL(blob);
