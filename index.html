@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>LAS / LAZ 中心座標抽出ツール</title>
+  <title>LAS / LAZ 中心座標抽出ツール</title>
   <!--
     このファイル（index.html）と同じフォルダに
       • laszip.js
@@ -57,7 +57,7 @@
   </style>
 </head>
 <body>
-  <h1>LAS / LAZ 中心座標抽出ツール</h1>
+  <h1>LAS / LAZ 中心座標抽出ツール</h1>
   <p>ここに <code>.las</code> または <code>.laz</code> ファイルを<strong>ドラッグ＆ドロップ</strong>してください</p>
   <div id="drop-area">Drop files here</div>
   <a id="download-csv" href="#" download="centers.csv">CSVをダウンロード</a>
@@ -66,30 +66,22 @@
   <!-- Laszip WebAssembly ローダー -->
   <script src="laszip.js"></script>
   <script>
-    /*
-      ––––––––––––––––––––––––––––
-      LAS / LAZ ヘッダー解析 & CSV 出力
-      ––––––––––––––––––––––––––––
-      1) ファイルを arrayBuffer で取得
-      2) LaszipModule() で WASM 初期化
-      3) Laszip.open(Uint8Array) → header 取得
-      4) 中心座標 = (min + max) / 2 （ヘッダは実座標値）
-      5) CSV 生成 → Blob → ダウンロードリンク表示
-    */
-
-    /** @type {Promise<any>} WebAssembly モジュール読み込み */
     const modulePromise = LaszipModule();
-
-    /** @type {{name:string,x:number,y:number,z:number}[]} */
     let results = [];
 
     const dropArea     = document.getElementById('drop-area');
     const output       = document.getElementById('output');
     const downloadLink = document.getElementById('download-csv');
 
-    // --------------- DnD UI ---------------
+    // グローバルにデフォルト動作防止
+    window.addEventListener('dragover', e => e.preventDefault());
+    window.addEventListener('drop', e => e.preventDefault());
+
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
-      dropArea.addEventListener(ev, e => e.preventDefault());
+      dropArea.addEventListener(ev, e => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
     });
 
     dropArea.addEventListener('dragover', () => dropArea.classList.add('hover'));
@@ -97,6 +89,7 @@
     dropArea.addEventListener('drop', handleDrop);
 
     async function handleDrop(e) {
+      console.log('🔽 ファイルがドロップされました');
       dropArea.classList.remove('hover');
       const files = Array.from(e.dataTransfer.files);
       if (!files.length) return;
@@ -118,8 +111,9 @@
     }
 
     async function processFile(file) {
+      console.log(`📂 処理中: ${file.name}`);
       const arrayBuffer = await file.arrayBuffer();
-      const module      = await modulePromise;            // WASM ready
+      const module      = await modulePromise;
       const laszip      = new module.Laszip();
       const data        = new Uint8Array(arrayBuffer);
 
@@ -128,7 +122,6 @@
       }
 
       const header = laszip.getHeader();
-      // header.minX などは実座標値（スケール・オフセット適用済み）
       const centerX = (header.minX + header.maxX) / 2;
       const centerY = (header.minY + header.maxY) / 2;
       const centerZ = (header.minZ + header.maxZ) / 2;
@@ -151,10 +144,11 @@
       const blob = new Blob([csv], { type: 'text/csv' });
       const url  = URL.createObjectURL(blob);
 
-      downloadLink.href        = url;
+      downloadLink.href = url;
       downloadLink.style.display = 'inline-block';
 
       output.textContent += '\nCSV ready → 上のボタンからダウンロードしてください\n';
+      console.log('✅ CSV生成完了');
     }
   </script>
 </body>
