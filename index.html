@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>LAS / LAZ 中心座標抽出ツール</title>
+  <!--
+    このファイル（index.html）と同じフォルダに
+      • laszip.js
+      • laszip.wasm
+    を配置してください。
+    公式リポジトリ: https://github.com/hobuinc/laszip.js
+  -->
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    #drop-area {
+      width: 80%;
+      max-width: 800px;
+      height: 200px;
+      border: 2px dashed #666;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.25s, border-color 0.25s;
+    }
+
+    #drop-area.hover {
+      background: #fafafa;
+      border-color: #222;
+    }
+
+    a#download-csv {
+      display: none;
+      padding: 0.6rem 1.2rem;
+      border: 1px solid #222;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+
+    pre#output {
+      width: 80%;
+      max-width: 800px;
+      white-space: pre-wrap;
+      background: #f7f7f7;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>LAS / LAZ 中心座標抽出ツール</h1>
+  <p>ここに <code>.las</code> または <code>.laz</code> ファイルを<strong>ドラッグ＆ドロップ</strong>してください</p>
+  <div id="drop-area">Drop files here</div>
+  <a id="download-csv" href="#" download="centers.csv">CSVをダウンロード</a>
+  <pre id="output"></pre>
+
+  <!-- Laszip WebAssembly ローダー -->
+  <script src="laszip.js"></script>
+  <script>
+    /*
+      ––––––––––––––––––––––––––––
+      LAS / LAZ ヘッダー解析 & CSV 出力
+      ––––––––––––––––––––––––––––
+      1) ファイルを arrayBuffer で取得
+      2) LaszipModule() で WASM 初期化
+      3) Laszip.open(Uint8Array) → header 取得
+      4) 中心座標 = (min + max) / 2 （ヘッダは実座標値）
+      5) CSV 生成 → Blob → ダウンロードリンク表示
+    */
+
+    /** @type {Promise<any>} WebAssembly モジュール読み込み */
+    const modulePromise = LaszipModule();
+
+    /** @type {{name:string,x:number,y:number,z:number}[]} */
+    let results = [];
+
+    const dropArea     = document.getElementById('drop-area');
+    const output       = document.getElementById('output');
+    const downloadLink = document.getElementById('download-csv');
+
+    // --------------- DnD UI ---------------
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+      dropArea.addEventListener(ev, e => e.preventDefault());
+    });
+
+    dropArea.addEventListener('dragover', () => dropArea.classList.add('hover'));
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('hover'));
+    dropArea.addEventListener('drop', handleDrop);
+
+    async function handleDrop(e) {
+      dropArea.classList.remove('hover');
+      const files = Array.from(e.dataTransfer.files);
+      if (!files.length) return;
+
+      results = [];
+      output.textContent = 'Processing...\n';
+      downloadLink.style.display = 'none';
+
+      for (const file of files) {
+        try {
+          await processFile(file);
+          output.textContent += `✔ ${file.name}\n`;
+        } catch (err) {
+          output.textContent += `✖ ${file.name}: ${err}\n`;
+        }
+      }
+
+      generateCSV();
+    }
+
+    async function processFile(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const module      = await modulePromise;            // WASM ready
+      const laszip      = new module.Laszip();
+      const data        = new Uint8Array(arrayBuffer);
+
+      if (!laszip.open(data)) {
+        throw new Error('Laszip failed to open');
+      }
+
+      const header = laszip.getHeader();
+      // header.minX などは実座標値（スケール・オフセット適用済み）
+      const centerX = (header.minX + header.maxX) / 2;
+      const centerY = (header.minY + header.maxY) / 2;
+      const centerZ = (header.minZ + header.maxZ) / 2;
+
+      results.push({ name: file.name, x: centerX, y: centerY, z: centerZ });
+      laszip.close();
+    }
+
+    function generateCSV() {
+      if (!results.length) {
+        output.textContent += 'No valid LAS/LAZ files processed.\n';
+        return;
+      }
+
+      let csv = 'ファイル名,X,Y,Z\n';
+      results.forEach(r => {
+        csv += `${r.name},${r.x},${r.y},${r.z}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url  = URL.createObjectURL(blob);
+
+      downloadLink.href        = url;
+      downloadLink.style.display = 'inline-block';
+
+      output.textContent += '\nCSV ready → 上のボタンからダウンロードしてください\n';
+    }
+  </script>
+</body>
+</html>
