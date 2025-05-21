@@ -75,9 +75,13 @@
 
     // グローバルにデフォルト動作防止
     window.addEventListener('dragover', e => e.preventDefault());
-    window.addEventListener('drop', e => e.preventDefault());
+    window.addEventListener('drop', e => {
+      console.log('🌍 window.drop 発火');
+      e.preventDefault();
+    });
 
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+    // dragenter, dragover, dragleave はビジュアル制御用
+    ['dragenter', 'dragover', 'dragleave'].forEach(ev => {
       dropArea.addEventListener(ev, e => {
         e.preventDefault();
         e.stopPropagation();
@@ -86,10 +90,17 @@
 
     dropArea.addEventListener('dragover', () => dropArea.classList.add('hover'));
     dropArea.addEventListener('dragleave', () => dropArea.classList.remove('hover'));
-    dropArea.addEventListener('drop', handleDrop);
+
+    // drop は明示的に handleDrop へ
+    dropArea.addEventListener('drop', e => {
+      console.log('🔽 dropArea.drop 発火');
+      e.preventDefault();
+      e.stopPropagation();
+      handleDrop(e);
+    });
 
     async function handleDrop(e) {
-      console.log('🔽 ファイルがドロップされました');
+      console.log('🔽 handleDrop 開始');
       dropArea.classList.remove('hover');
       const files = Array.from(e.dataTransfer.files);
       if (!files.length) return;
